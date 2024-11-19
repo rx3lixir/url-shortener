@@ -1,12 +1,16 @@
 package main
 
 import (
+	"net/http"
 	"os"
 
-	"log/slog"
-
+	"github.com/charmbracelet/log"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/rx3lixir/urlshortener/internal/config"
+	"github.com/rx3lixir/urlshortener/internal/http-server/handlers/url/save"
+	mwLogger "github.com/rx3lixir/urlshortener/internal/http-server/middleware/logger"
 	"github.com/rx3lixir/urlshortener/internal/lib/logger/sl"
 	"github.com/rx3lixir/urlshortener/internal/storage/sqlite"
 )
@@ -21,28 +25,61 @@ func main() {
 	cfg := config.MustLoad()
 	log := setupLogger(cfg.Env)
 
-	log.Info("starting url-shortener", slog.String("env", cfg.Env))
+	log.Info("starting url-shortener", "env:", cfg.Env)
 
-	storage, err := sqlite.New(cfg.Storage)
+	storage, err := sqlite.New(cfg.StoragePath)
 	if err != nil {
 		log.Error("Failed to init storage", sl.Err(err))
 		os.Exit(1)
 	}
 
-	_ = storage
+	router := chi.NewRouter()
+
+	router.Use(middleware.RequestID)
+	router.Use(middleware.Logger)
+	router.Use(mwLogger.New(log))
+	router.Use(middleware.Recoverer)
+	router.Use(middleware.URLFormat)
+
+	router.Post("/url", save.New(log, storage))
+
+	log.Info("Starting server:", "address:", cfg.Address)
+
+	srv := &http.Server{
+		Addr:         cfg.Address,
+		Handler:      router,
+		ReadTimeout:  cfg.HTTPServer.Timeout,
+		WriteTimeout: cfg.HTTPServer.Timeout,
+		IdleTimeout:  cfg.HTTPServer.Timeout,
+	}
+
+	if err := srv.ListenAndServe(); err != nil {
+		log.Error("failed to start server")
+	}
+
+	log.Error("server crashed")
 }
 
-func setupLogger(env string) *slog.Logger {
-	var log *slog.Logger
+func setupLogger(env string) *log.Logger {
+	var logger *log.Logger
 
 	switch env {
 	case envLocal:
-		log = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+		logger = log.NewWithOptions(os.Stdout, log.Options{
+			Formatter: log.TextFormatter,
+			Level:     log.DebugLevel,
+		})
 	case envDev:
-		log = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+		logger = log.NewWithOptions(os.Stdout, log.Options{
+			Formatter: log.JSONFormatter,
+			Level:     log.DebugLevel,
+		})
 	case envProd:
-		log = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+		logger = log.NewWithOptions(os.Stdout, log.Options{
+			Formatter: log.JSONFormatter,
+			Level:     log.InfoLevel,
+		})
 	}
 
-	return log
+	return logger
 }
