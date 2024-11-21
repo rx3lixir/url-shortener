@@ -25,7 +25,7 @@ func main() {
 	cfg := config.MustLoad()
 	log := setupLogger(cfg.Env)
 
-	log.Info("starting url-shortener", "env:", cfg.Env)
+	log.Info("starting url-shortener")
 
 	storage, err := sqlite.New(cfg.StoragePath)
 	if err != nil {
@@ -43,7 +43,7 @@ func main() {
 
 	router.Post("/url", save.New(log, storage))
 
-	log.Info("Starting server:", "address:", cfg.Address)
+	log.Info("starting server:", "address:", cfg.Address)
 
 	srv := &http.Server{
 		Addr:         cfg.Address,
@@ -66,16 +66,19 @@ func setupLogger(env string) *log.Logger {
 	switch env {
 	case envLocal:
 		logger = log.NewWithOptions(os.Stdout, log.Options{
+			Prefix:    "🍃env=local",
 			Formatter: log.TextFormatter,
 			Level:     log.DebugLevel,
 		})
 	case envDev:
 		logger = log.NewWithOptions(os.Stdout, log.Options{
+			Prefix:    "🍃env=dev",
 			Formatter: log.JSONFormatter,
 			Level:     log.DebugLevel,
 		})
 	case envProd:
 		logger = log.NewWithOptions(os.Stdout, log.Options{
+			Prefix:    "🍃env=prod",
 			Formatter: log.JSONFormatter,
 			Level:     log.InfoLevel,
 		})

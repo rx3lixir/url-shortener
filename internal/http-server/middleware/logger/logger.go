@@ -2,6 +2,7 @@ package mwLogger
 
 import (
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/charmbracelet/log"
@@ -10,7 +11,10 @@ import (
 
 func New(logger *log.Logger) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
-		logger = logger.With("component", "middleware/logger")
+
+		logger = log.NewWithOptions(os.Stdout, log.Options{
+			Prefix: " component=middleware/logger",
+		})
 
 		logger.Info("Logger middleware enabled")
 
