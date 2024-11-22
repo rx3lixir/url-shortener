@@ -1,45 +1,43 @@
-package mwLogger
+package logger
 
 import (
 	"net/http"
-	"os"
 	"time"
 
-	"github.com/charmbracelet/log"
 	"github.com/go-chi/chi/v5/middleware"
+	"log/slog"
 )
 
-func New(logger *log.Logger) func(next http.Handler) http.Handler {
+func New(log *slog.Logger) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
+		log := log.With(
+			slog.String("component", "middleware/logger"),
+		)
 
-		logger = log.NewWithOptions(os.Stdout, log.Options{
-			Prefix: " component=middleware/logger",
-		})
-
-		logger.Info("Logger middleware enabled")
+		log.Info("logger middleware enabled")
 
 		fn := func(w http.ResponseWriter, r *http.Request) {
-			entry := logger.With(
-				"method", r.Method,
-				"path", r.URL.Path,
-				"remote_addr", r.RemoteAddr,
-				"user_agent", r.UserAgent(),
-				"request_id", middleware.GetReqID(r.Context()),
+			entry := log.With(
+				slog.String("method", r.Method),
+				slog.String("path", r.URL.Path),
+				slog.String("remote_addr", r.RemoteAddr),
+				slog.String("user_agent", r.UserAgent()),
+				slog.String("request_id", middleware.GetReqID(r.Context())),
 			)
 			ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 
 			t1 := time.Now()
 			defer func() {
-				duration := time.Since(t1)
-				entry.With(
-					"status", ww.Status(),
-					"bytes", ww.BytesWritten(),
-					"duration", duration.String(),
-				).Info("Request completed")
+				entry.Info("request completed",
+					slog.Int("status", ww.Status()),
+					slog.Int("bytes", ww.BytesWritten()),
+					slog.String("duration", time.Since(t1).String()),
+				)
 			}()
 
 			next.ServeHTTP(ww, r)
 		}
+
 		return http.HandlerFunc(fn)
 	}
 }

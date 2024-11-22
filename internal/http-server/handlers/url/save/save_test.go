@@ -14,7 +14,7 @@ import (
 
 	"github.com/rx3lixir/urlshortener/internal/http-server/handlers/url/save"
 	"github.com/rx3lixir/urlshortener/internal/http-server/handlers/url/save/mocks"
-	"github.com/rx3lixir/urlshortener/internal/lib/logger/handlers/logdiscard"
+	"github.com/rx3lixir/urlshortener/internal/lib/logger/handlers/slogdiscard"
 )
 
 func TestSaveHandler(t *testing.T) {
@@ -70,7 +70,7 @@ func TestSaveHandler(t *testing.T) {
 					Once()
 			}
 
-			handler := save.New(logdiscard.NewDiscardLogger(), urlSaverMock)
+			handler := save.New(slogdiscard.NewDiscardLogger(), urlSaverMock)
 
 			input := fmt.Sprintf(`{"url": "%s", "alias": "%s"}`, tc.url, tc.alias)
 
